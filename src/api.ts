@@ -1,4 +1,4 @@
-import type { Reservation } from './types'
+import type { Gift, Reservation } from './types'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options)
@@ -32,6 +32,57 @@ export function changePassword(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}
+
+// ── Gifts ─────────────────────────────────────────────────
+
+export function fetchGifts(): Promise<Gift[]> {
+  return request('/api/gifts')
+}
+
+export function createGift(
+  data: Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>,
+  token: string,
+): Promise<Gift> {
+  return request('/api/gifts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify(data),
+  })
+}
+
+export function patchGift(
+  id: number,
+  data: Partial<Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>>,
+  token: string,
+): Promise<Gift> {
+  return request(`/api/gifts/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify(data),
+  })
+}
+
+export function removeGift(id: number, token: string): Promise<void> {
+  return request(`/api/gifts/${id}`, {
+    method: 'DELETE',
+    headers: authHeader(token),
+  })
+}
+
+export function reserveGiftApi(id: number, reservadoPor: string, token: string): Promise<Gift> {
+  return request(`/api/gifts/${id}/reserve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ reservadoPor }),
+  })
+}
+
+export function releaseGiftApi(id: number, token: string): Promise<Gift> {
+  return request(`/api/gifts/${id}/release`, {
+    method: 'POST',
+    headers: authHeader(token),
   })
 }
 

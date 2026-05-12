@@ -1,46 +1,54 @@
 import { useState, useEffect } from 'react'
 import type { Gift } from '../types'
+import {
+  fetchGifts as apiFetch,
+  createGift as apiCreate,
+  patchGift as apiPatch,
+  removeGift as apiRemove,
+  reserveGiftApi,
+  releaseGiftApi,
+} from '../api'
 
-const DEFAULT_GIFTS: Gift[] = [
-  { id: 1, nome: 'Jogo de jantar completo', loja: 'Tok&Stok', valor: 480, emoji: '🍽️', desc: 'Para 12 pessoas, porcelana branca', link: '', reservado: false, reservadoPor: '' },
-  { id: 2, nome: 'Panela de pressão elétrica', loja: 'Tramontina', valor: 320, emoji: '🍲', desc: 'Inox 6L, ideal para o dia a dia', link: '', reservado: false, reservadoPor: '' },
-  { id: 3, nome: 'Jogo de cama king', loja: 'Trousseau', valor: 650, emoji: '🛏️', desc: 'Algodão egípcio 300 fios, king size', link: '', reservado: true, reservadoPor: 'Família Silva' },
-  { id: 4, nome: 'Batedeira planetária', loja: 'KitchenAid', valor: 1200, emoji: '🎂', desc: 'Cor: cinza, 4,8L', link: '', reservado: false, reservadoPor: '' },
-  { id: 5, nome: 'Vinho para a viagem', loja: 'Decanter', valor: 180, emoji: '🍷', desc: 'Sugestão: Chateau Margaux ou similar', link: '', reservado: false, reservadoPor: '' },
-]
-
-export function useGifts() {
-  const [gifts, setGifts] = useState<Gift[]>(() => {
-    const stored = localStorage.getItem('wl_gifts')
-    return stored ? (JSON.parse(stored) as Gift[]) : DEFAULT_GIFTS
-  })
+export function useGifts(token: string | null) {
+  const [gifts, setGifts] = useState<Gift[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    localStorage.setItem('wl_gifts', JSON.stringify(gifts))
-  }, [gifts])
+    apiFetch()
+      .then(setGifts)
+      .catch(err => console.error('Erro ao carregar presentes:', err))
+      .finally(() => setLoading(false))
+  }, [])
 
-  function addGift(data: Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>) {
-    setGifts(prev => {
-      const newId = prev.length ? Math.max(...prev.map(g => g.id)) + 1 : 1
-      return [...prev, { id: newId, ...data, reservado: false, reservadoPor: '' }]
-    })
+  async function addGift(data: Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>): Promise<void> {
+    if (!token) throw new Error('Não autenticado')
+    const created = await apiCreate(data, token)
+    setGifts(prev => [...prev, created])
   }
 
-  function updateGift(id: number, data: Partial<Gift>) {
-    setGifts(prev => prev.map(g => (g.id === id ? { ...g, ...data } : g)))
+  async function updateGift(id: number, data: Partial<Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>>): Promise<void> {
+    if (!token) throw new Error('Não autenticado')
+    const updated = await apiPatch(id, data, token)
+    setGifts(prev => prev.map(g => (g.id === id ? updated : g)))
   }
 
-  function deleteGift(id: number) {
+  async function deleteGift(id: number): Promise<void> {
+    if (!token) throw new Error('Não autenticado')
+    await apiRemove(id, token)
     setGifts(prev => prev.filter(g => g.id !== id))
   }
 
-  function reserveGift(id: number, reservadoPor: string) {
-    updateGift(id, { reservado: true, reservadoPor })
+  async function reserveGift(id: number, reservadoPor: string): Promise<void> {
+    if (!token) throw new Error('Não autenticado')
+    const updated = await reserveGiftApi(id, reservadoPor, token)
+    setGifts(prev => prev.map(g => (g.id === id ? updated : g)))
   }
 
-  function releaseGift(id: number) {
-    updateGift(id, { reservado: false, reservadoPor: '' })
+  async function releaseGift(id: number): Promise<void> {
+    if (!token) throw new Error('Não autenticado')
+    const updated = await releaseGiftApi(id, token)
+    setGifts(prev => prev.map(g => (g.id === id ? updated : g)))
   }
 
-  return { gifts, addGift, updateGift, deleteGift, reserveGift, releaseGift }
+  return { gifts, loading, addGift, updateGift, deleteGift, reserveGift, releaseGift }
 }

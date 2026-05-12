@@ -4,7 +4,8 @@
       "PowerShell(npm *)",
       "PowerShell(New-Item *)",
       "Bash(npx tsc *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

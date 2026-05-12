@@ -5,8 +5,8 @@ interface AddEditGiftModalProps {
   isOpen: boolean
   gift: Gift | null
   onClose: () => void
-  onSave: (data: Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>) => void
-  onUpdate: (id: number, data: Partial<Gift>) => void
+  onSave: (data: Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>) => Promise<void>
+  onUpdate: (id: number, data: Partial<Omit<Gift, 'id' | 'reservado' | 'reservadoPor'>>) => Promise<void>
   onToast: (msg: string) => void
 }
 
@@ -18,6 +18,7 @@ const LABEL_CLS = 'block text-[10px] sm:text-[11px] tracking-[0.2em] uppercase t
 
 export function AddEditGiftModal({ isOpen, gift, onClose, onSave, onUpdate, onToast }: AddEditGiftModalProps) {
   const [form, setForm] = useState(EMPTY)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -37,7 +38,7 @@ export function AddEditGiftModal({ isOpen, gift, onClose, onSave, onUpdate, onTo
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     const nome = form.nome.trim()
     const valor = parseFloat(form.valor)
     if (!nome || isNaN(valor) || valor <= 0) {
@@ -54,14 +55,21 @@ export function AddEditGiftModal({ isOpen, gift, onClose, onSave, onUpdate, onTo
       link: form.link.trim(),
     }
 
-    if (gift) {
-      onUpdate(gift.id, data)
-      onToast('Presente atualizado! ✓')
-    } else {
-      onSave(data)
-      onToast('Presente adicionado! 🎁')
+    setSaving(true)
+    try {
+      if (gift) {
+        await onUpdate(gift.id, data)
+        onToast('Presente atualizado! ✓')
+      } else {
+        await onSave(data)
+        onToast('Presente adicionado! 🎁')
+      }
+      onClose()
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : 'Erro ao salvar presente.')
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   return (
@@ -96,40 +104,41 @@ export function AddEditGiftModal({ isOpen, gift, onClose, onSave, onUpdate, onTo
         <div className="px-6 sm:px-7 pb-8 pt-4 sm:pt-6 space-y-4">
           <div>
             <label className={LABEL_CLS}>Nome do presente</label>
-            <input className={INPUT_CLS} placeholder="Ex: Jogo de jantar para 12 pessoas" {...field('nome')} />
+            <input className={INPUT_CLS} placeholder="Ex: Jogo de jantar para 12 pessoas" {...field('nome')} disabled={saving} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL_CLS}>Valor (R$)</label>
-              <input type="number" step="0.01" className={INPUT_CLS} placeholder="0,00" {...field('valor')} />
+              <input type="number" step="0.01" className={INPUT_CLS} placeholder="0,00" {...field('valor')} disabled={saving} />
             </div>
             <div>
               <label className={LABEL_CLS}>Loja</label>
-              <input className={INPUT_CLS} placeholder="Ex: Tok&amp;Stok" {...field('loja')} />
+              <input className={INPUT_CLS} placeholder="Ex: Tok&amp;Stok" {...field('loja')} disabled={saving} />
             </div>
           </div>
 
           <div>
             <label className={LABEL_CLS}>Emoji (opcional)</label>
-            <input className={INPUT_CLS} placeholder="🍽️" maxLength={4} {...field('emoji')} />
+            <input className={INPUT_CLS} placeholder="🍽️" maxLength={4} {...field('emoji')} disabled={saving} />
           </div>
 
           <div>
             <label className={LABEL_CLS}>Descrição (opcional)</label>
-            <input className={INPUT_CLS} placeholder="Breve descrição do presente" {...field('desc')} />
+            <input className={INPUT_CLS} placeholder="Breve descrição do presente" {...field('desc')} disabled={saving} />
           </div>
 
           <div>
             <label className={LABEL_CLS}>Link do produto (opcional)</label>
-            <input className={INPUT_CLS} placeholder="https://..." {...field('link')} />
+            <input className={INPUT_CLS} placeholder="https://..." {...field('link')} disabled={saving} />
           </div>
 
           <button
-            onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown disabled:opacity-60"
           >
-            Salvar Presente
+            {saving ? 'Salvando...' : 'Salvar Presente'}
           </button>
         </div>
       </div>

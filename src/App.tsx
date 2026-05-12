@@ -14,9 +14,9 @@ import { LoginModal } from './components/LoginModal'
 import { Toast } from './components/Toast'
 
 export function App() {
-  const { gifts, addGift, updateGift, deleteGift, reserveGift, releaseGift } = useGifts()
   const { settings, updateSettings } = useSettings()
   const { isAdmin, token, login, logout } = useAdmin()
+  const { gifts, loading, addGift, updateGift, deleteGift, reserveGift, releaseGift } = useGifts(token)
 
   const [openModal, setOpenModal] = useState<ModalType>(null)
   const [selectedGift, setSelectedGift] = useState<Gift | null>(null)
@@ -76,13 +76,20 @@ export function App() {
   }
 
   function handleDeleteGift(id: number) {
-    deleteGift(id)
-    setToast('Presente removido.')
+    void deleteGift(id)
+      .then(() => setToast('Presente removido.'))
+      .catch(() => setToast('Erro ao remover presente.'))
   }
 
   function handleReleaseGift(id: number) {
-    releaseGift(id)
-    setToast('Presente disponível novamente.')
+    void releaseGift(id)
+      .then(() => setToast('Presente disponível novamente.'))
+      .catch(() => setToast('Erro ao liberar presente.'))
+  }
+
+  function handleConfirmReservation(giftId: number, reservadoPor: string) {
+    void reserveGift(giftId, reservadoPor)
+      .catch(() => setToast('Erro ao marcar presente como reservado.'))
   }
 
   function closeModal() {
@@ -93,7 +100,13 @@ export function App() {
     <div className="min-h-screen bg-cream text-ink font-jost overflow-x-hidden">
       <Hero settings={settings} />
 
-      <GiftList gifts={gifts} onGiftClick={openGiftModal} />
+      {loading ? (
+        <div className="flex justify-center items-center py-24">
+          <div className="w-8 h-8 rounded-full border-2 border-gold border-t-transparent animate-spin" />
+        </div>
+      ) : (
+        <GiftList gifts={gifts} onGiftClick={openGiftModal} />
+      )}
 
       <footer className="text-center px-6 py-10 border-t border-gold/25 text-[11px] sm:text-[12px] text-muted tracking-[0.1em]">
         ✦ &nbsp; Feito com amor para o nosso casamento &nbsp; ✦
@@ -109,7 +122,7 @@ export function App() {
         onEditGift={handleEditGift}
         onDeleteGift={handleDeleteGift}
         onReleaseGift={handleReleaseGift}
-        onConfirmReservation={reserveGift}
+        onConfirmReservation={handleConfirmReservation}
         onToast={setToast}
       />
 

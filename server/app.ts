@@ -10,6 +10,21 @@ function getDb() {
   return neon(url)
 }
 
+// Maps a DB row to the Gift shape expected by the frontend
+function rowToGift(row: Record<string, unknown>) {
+  return {
+    id: row.id as number,
+    nome: row.nome as string,
+    loja: (row.loja as string) || '',
+    valor: Number(row.valor),
+    emoji: (row.emoji as string) || '🎁',
+    desc: (row.descricao as string) || '',
+    link: (row.link as string) || '',
+    reservado: row.reservado as boolean,
+    reservadoPor: (row.reservado_por as string) || '',
+  }
+}
+
 export const app = new Hono()
 
 app.use('*', cors({ origin: '*' }))
@@ -34,7 +49,6 @@ app.post('/api/auth/login', async c => {
 
   let valid = false
   if (rows.length === 0) {
-    // Bootstrap: first login uses ADMIN_INITIAL_PASSWORD, then stores hash in DB
     const initial = process.env.ADMIN_INITIAL_PASSWORD
     if (!initial) return c.json({ error: 'Servidor não configurado. Defina ADMIN_INITIAL_PASSWORD.' }, 500)
     if (password === initial) {
@@ -59,12 +73,8 @@ app.post('/api/auth/change-password', requireAuth, async c => {
     newPassword: string
   }>()
 
-  if (!currentPassword || !newPassword) {
-    return c.json({ error: 'Campos obrigatórios.' }, 400)
-  }
-  if (newPassword.length < 8) {
-    return c.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, 400)
-  }
+  if (!currentPassword || !newPassword) return c.json({ error: 'Campos obrigatórios.' }, 400)
+  if (newPassword.length < 8) return c.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, 400)
 
   const sql = getDb()
   const rows = await sql`SELECT password_hash FROM admin_config WHERE id = 1`
@@ -75,8 +85,87 @@ app.post('/api/auth/change-password', requireAuth, async c => {
 
   const newHash = await hashPassword(newPassword)
   await sql`UPDATE admin_config SET password_hash = ${newHash}, updated_at = NOW() WHERE id = 1`
-
   return c.json({ ok: true })
+})
+
+// ── GET /api/gifts (público) ──────────────────────────────
+app.get('/api/gifts', async c => {
+  const sql = getDb()
+  const rows = await sql`SELECT * FROM gifts ORDER BY id ASC`
+  return c.json(rows.map(r => rowToGift(r as Record<string, unknown>)))
+})
+
+// ── POST /api/gifts (admin) ───────────────────────────────
+app.post('/api/gifts', requireAuth, async c => {
+  const sql = getDb()
+  const { nome, loja, valor, emoji, desc, link } = await c.req.json<{
+    nome: string; loja: string; valor: number; emoji: string; desc: string; link: string
+  }>()
+
+  if (!nome?.trim()) return c.json({ error: 'Nome é obrigatório.' }, 400)
+
+  const rows = await sql`
+    INSERT INTO gifts (nome, loja, valor, emoji, descricao, link)
+    VALUES (${nome.trim()}, ${loja || ''}, ${valor ?? 0}, ${emoji || '🎁'}, ${desc || ''}, ${link || ''})
+    RETURNING *
+  `
+  return c.json(rowToGift(rows[0] as Record<string, unknown>), 201)
+})
+
+// ── PATCH /api/gifts/:id (admin) — editar campos ─────────
+app.patch('/api/gifts/:id', requireAuth, async c => {
+  const sql = getDb()
+  const id = Number(c.req.param('id'))
+  const { nome, loja, valor, emoji, desc, link } = await c.req.json<{
+    nome: string; loja: string; valor: number; emoji: string; desc: string; link: string
+  }>()
+
+  const rows = await sql`
+    UPDATE gifts
+    SET nome = ${nome}, loja = ${loja}, valor = ${valor},
+        emoji = ${emoji}, descricao = ${desc}, link = ${link}
+    WHERE id = ${id}
+    RETURNING *
+  `
+  if (rows.length === 0) return c.json({ error: 'Presente não encontrado.' }, 404)
+  return c.json(rowToGift(rows[0] as Record<string, unknown>))
+})
+
+// ── DELETE /api/gifts/:id (admin) ────────────────────────
+app.delete('/api/gifts/:id', requireAuth, async c => {
+  const sql = getDb()
+  const id = Number(c.req.param('id'))
+  await sql`DELETE FROM gifts WHERE id = ${id}`
+  return c.json({ ok: true })
+})
+
+// ── POST /api/gifts/:id/reserve (admin) ──────────────────
+app.post('/api/gifts/:id/reserve', requireAuth, async c => {
+  const sql = getDb()
+  const id = Number(c.req.param('id'))
+  const { reservadoPor } = await c.req.json<{ reservadoPor: string }>()
+
+  const rows = await sql`
+    UPDATE gifts SET reservado = true, reservado_por = ${reservadoPor || ''}
+    WHERE id = ${id}
+    RETURNING *
+  `
+  if (rows.length === 0) return c.json({ error: 'Presente não encontrado.' }, 404)
+  return c.json(rowToGift(rows[0] as Record<string, unknown>))
+})
+
+// ── POST /api/gifts/:id/release (admin) ──────────────────
+app.post('/api/gifts/:id/release', requireAuth, async c => {
+  const sql = getDb()
+  const id = Number(c.req.param('id'))
+
+  const rows = await sql`
+    UPDATE gifts SET reservado = false, reservado_por = ''
+    WHERE id = ${id}
+    RETURNING *
+  `
+  if (rows.length === 0) return c.json({ error: 'Presente não encontrado.' }, 404)
+  return c.json(rowToGift(rows[0] as Record<string, unknown>))
 })
 
 // ── POST /api/reservations (público — convidados) ─────────
@@ -137,7 +226,6 @@ app.patch('/api/reservations/:id', requireAuth, async c => {
     WHERE id = ${id}
     RETURNING *
   `
-
   if (rows.length === 0) return c.json({ error: 'Reserva não encontrada' }, 404)
   return c.json(rows[0])
 })
