@@ -10,7 +10,6 @@ function getDb() {
   return neon(url)
 }
 
-// Maps a DB row to the Gift shape expected by the frontend
 function rowToGift(row: Record<string, unknown>) {
   return {
     id: row.id as number,
@@ -25,7 +24,9 @@ function rowToGift(row: Record<string, unknown>) {
   }
 }
 
-export const app = new Hono()
+// basePath('/api') so routes work both locally (localhost:3001/api/...)
+// and on Vercel (api/[...route].ts receives the full /api/... URL)
+export const app = new Hono().basePath('/api')
 
 app.use('*', cors({ origin: '*' }))
 
@@ -39,8 +40,8 @@ async function requireAuth(c: Context, next: Next) {
   await next()
 }
 
-// ── POST /api/auth/login ──────────────────────────────────
-app.post('/api/auth/login', async c => {
+// ── POST /auth/login ──────────────────────────────────────
+app.post('/auth/login', async c => {
   const { password } = await c.req.json<{ password: string }>()
   if (!password) return c.json({ error: 'Senha obrigatória.' }, 400)
 
@@ -66,8 +67,8 @@ app.post('/api/auth/login', async c => {
   return c.json({ token })
 })
 
-// ── POST /api/auth/change-password ───────────────────────
-app.post('/api/auth/change-password', requireAuth, async c => {
+// ── POST /auth/change-password ────────────────────────────
+app.post('/auth/change-password', requireAuth, async c => {
   const { currentPassword, newPassword } = await c.req.json<{
     currentPassword: string
     newPassword: string
@@ -88,15 +89,15 @@ app.post('/api/auth/change-password', requireAuth, async c => {
   return c.json({ ok: true })
 })
 
-// ── GET /api/gifts (público) ──────────────────────────────
-app.get('/api/gifts', async c => {
+// ── GET /gifts (público) ──────────────────────────────────
+app.get('/gifts', async c => {
   const sql = getDb()
   const rows = await sql`SELECT * FROM gifts ORDER BY id ASC`
   return c.json(rows.map(r => rowToGift(r as Record<string, unknown>)))
 })
 
-// ── POST /api/gifts (admin) ───────────────────────────────
-app.post('/api/gifts', requireAuth, async c => {
+// ── POST /gifts (admin) ───────────────────────────────────
+app.post('/gifts', requireAuth, async c => {
   const sql = getDb()
   const { nome, loja, valor, emoji, desc, link } = await c.req.json<{
     nome: string; loja: string; valor: number; emoji: string; desc: string; link: string
@@ -112,8 +113,8 @@ app.post('/api/gifts', requireAuth, async c => {
   return c.json(rowToGift(rows[0] as Record<string, unknown>), 201)
 })
 
-// ── PATCH /api/gifts/:id (admin) — editar campos ─────────
-app.patch('/api/gifts/:id', requireAuth, async c => {
+// ── PATCH /gifts/:id (admin) ──────────────────────────────
+app.patch('/gifts/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   const { nome, loja, valor, emoji, desc, link } = await c.req.json<{
@@ -131,16 +132,16 @@ app.patch('/api/gifts/:id', requireAuth, async c => {
   return c.json(rowToGift(rows[0] as Record<string, unknown>))
 })
 
-// ── DELETE /api/gifts/:id (admin) ────────────────────────
-app.delete('/api/gifts/:id', requireAuth, async c => {
+// ── DELETE /gifts/:id (admin) ─────────────────────────────
+app.delete('/gifts/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   await sql`DELETE FROM gifts WHERE id = ${id}`
   return c.json({ ok: true })
 })
 
-// ── POST /api/gifts/:id/reserve (admin) ──────────────────
-app.post('/api/gifts/:id/reserve', requireAuth, async c => {
+// ── POST /gifts/:id/reserve (admin) ──────────────────────
+app.post('/gifts/:id/reserve', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   const { reservadoPor } = await c.req.json<{ reservadoPor: string }>()
@@ -154,8 +155,8 @@ app.post('/api/gifts/:id/reserve', requireAuth, async c => {
   return c.json(rowToGift(rows[0] as Record<string, unknown>))
 })
 
-// ── POST /api/gifts/:id/release (admin) ──────────────────
-app.post('/api/gifts/:id/release', requireAuth, async c => {
+// ── POST /gifts/:id/release (admin) ──────────────────────
+app.post('/gifts/:id/release', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
 
@@ -168,18 +169,12 @@ app.post('/api/gifts/:id/release', requireAuth, async c => {
   return c.json(rowToGift(rows[0] as Record<string, unknown>))
 })
 
-// ── POST /api/reservations (público — convidados) ─────────
-app.post('/api/reservations', async c => {
+// ── POST /reservations (público — convidados) ─────────────
+app.post('/reservations', async c => {
   const sql = getDb()
-  const body = await c.req.json<{
-    gift_id: number
-    gift_name: string
-    guest_name: string
-    amount: number
-    comprovante: string
+  const { gift_id, gift_name, guest_name, amount, comprovante } = await c.req.json<{
+    gift_id: number; gift_name: string; guest_name: string; amount: number; comprovante: string
   }>()
-
-  const { gift_id, gift_name, guest_name, amount, comprovante } = body
 
   if (!gift_id || !guest_name?.trim()) {
     return c.json({ error: 'gift_id e guest_name são obrigatórios' }, 400)
@@ -202,15 +197,15 @@ app.post('/api/reservations', async c => {
   return c.json(rows[0], 201)
 })
 
-// ── GET /api/reservations (admin) ─────────────────────────
-app.get('/api/reservations', requireAuth, async c => {
+// ── GET /reservations (admin) ─────────────────────────────
+app.get('/reservations', requireAuth, async c => {
   const sql = getDb()
   const rows = await sql`SELECT * FROM reservations ORDER BY created_at DESC`
   return c.json(rows)
 })
 
-// ── PATCH /api/reservations/:id (admin) ──────────────────
-app.patch('/api/reservations/:id', requireAuth, async c => {
+// ── PATCH /reservations/:id (admin) ──────────────────────
+app.patch('/reservations/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   const { status } = await c.req.json<{ status: 'confirmed' | 'rejected' }>()
@@ -230,8 +225,8 @@ app.patch('/api/reservations/:id', requireAuth, async c => {
   return c.json(rows[0])
 })
 
-// ── DELETE /api/reservations/:id (admin) ─────────────────
-app.delete('/api/reservations/:id', requireAuth, async c => {
+// ── DELETE /reservations/:id (admin) ─────────────────────
+app.delete('/reservations/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   await sql`DELETE FROM reservations WHERE id = ${id}`

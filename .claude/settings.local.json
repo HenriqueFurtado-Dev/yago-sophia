@@ -5,7 +5,11 @@
       "PowerShell(New-Item *)",
       "Bash(npx tsc *)",
       "Bash(node *)",
-      "PowerShell(Get-NetTCPConnection *)"
+      "PowerShell(Get-NetTCPConnection *)",
+      "mcp__claude_ai_Vercel__deploy_to_vercel",
+      "Bash(npx vercel *)",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs"
     ]
   }
 }
