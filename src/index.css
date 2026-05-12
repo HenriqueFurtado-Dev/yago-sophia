@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #faf6f0;
+  --color-cream2: #f2ebe0;
+  --color-gold: #b8965a;
+  --color-gold-light: #d4b07a;
+  --color-gold-pale: #f0e4cc;
+  --color-sage: #7a9e7e;
+  --color-sage-light: #a8c4ab;
+  --color-sage-pale: #e8f0e9;
+  --color-brown: #5c4a32;
+  --color-brown-light: #8a7055;
+  --color-ink: #3a2e22;
+  --color-muted: #8a7a68;
+
+  --font-playfair: 'Playfair Display', serif;
+  --font-cormorant: 'Cormorant Garamond', serif;
+  --font-jost: 'Jost', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Jost', sans-serif;
+  background-color: #faf6f0;
+  color: #3a2e22;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(6px); }
+}
+
+@keyframes floatPolaroid1 {
+  0%, 100% { transform: rotate(-6deg) translateY(0px); }
+  50% { transform: rotate(-6deg) translateY(-10px); }
+}
+
+@keyframes floatPolaroid2 {
+  0%, 100% { transform: rotate(4deg) translateY(0px); }
+  50% { transform: rotate(4deg) translateY(-8px); }
+}
+
+@keyframes floatPolaroid3 {
+  0%, 100% { transform: rotate(-2deg) translateY(0px); }
+  50% { transform: rotate(-2deg) translateY(-12px); }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 2.5s ease-in-out infinite;
+  }
+
+  .polaroid-1 {
+    animation: floatPolaroid1 3.8s ease-in-out infinite;
+  }
+
+  .polaroid-2 {
+    animation: floatPolaroid2 4.4s ease-in-out infinite;
+    animation-delay: 0.6s;
+  }
+
+  .polaroid-3 {
+    animation: floatPolaroid3 3.2s ease-in-out infinite;
+    animation-delay: 1.2s;
+  }
+}
