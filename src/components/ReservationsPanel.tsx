@@ -3,6 +3,7 @@ import type { Reservation } from '../types'
 import { fetchReservations, updateReservation, deleteReservation } from '../api'
 
 interface ReservationsPanelProps {
+  token: string | null
   onConfirm: (giftId: number, guestName: string) => void
   onRelease: (giftId: number) => void
   onToast: (msg: string) => void
@@ -35,16 +36,17 @@ const STATUS_CLS: Record<Reservation['status'], string> = {
   rejected: 'bg-[#fdecea] text-[#c0392b]',
 }
 
-export function ReservationsPanel({ onConfirm, onRelease, onToast }: ReservationsPanelProps) {
+export function ReservationsPanel({ token, onConfirm, onRelease, onToast }: ReservationsPanelProps) {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [actionId, setActionId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
+    if (!token) return
     setLoading(true)
     try {
-      const data = await fetchReservations()
+      const data = await fetchReservations(token)
       setReservations(data)
       setLoaded(true)
     } catch {
@@ -52,19 +54,20 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
     } finally {
       setLoading(false)
     }
-  }, [onToast])
+  }, [token, onToast])
 
   async function handleAction(res: Reservation, status: 'confirmed' | 'rejected') {
+    if (!token) return
     setActionId(res.id)
     try {
-      const updated = await updateReservation(res.id, status)
+      const updated = await updateReservation(res.id, status, token)
       setReservations(prev => prev.map(r => (r.id === res.id ? updated : r)))
       if (status === 'confirmed') {
         onConfirm(res.gift_id, res.guest_name)
         onToast(`✓ Confirmado! ${res.gift_name} reservado por ${res.guest_name}`)
       } else {
         onRelease(res.gift_id)
-        onToast(`Presente liberado novamente.`)
+        onToast('Presente liberado novamente.')
       }
     } catch {
       onToast('Erro ao atualizar reserva.')
@@ -74,10 +77,11 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
   }
 
   async function handleDelete(id: number) {
+    if (!token) return
     if (!confirm('Remover esta reserva da lista?')) return
     setActionId(id)
     try {
-      await deleteReservation(id)
+      await deleteReservation(id, token)
       setReservations(prev => prev.filter(r => r.id !== id))
       onToast('Reserva removida.')
     } catch {
@@ -103,7 +107,7 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
           </h3>
         </div>
         <button
-          onClick={load}
+          onClick={() => void load()}
           disabled={loading}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gold/40 text-brown text-[12px] font-medium tracking-[0.05em] uppercase transition-colors hover:bg-gold-pale disabled:opacity-50"
         >
@@ -123,7 +127,6 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
         </p>
       )}
 
-      {/* Pending reservations */}
       {pending.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
@@ -140,16 +143,15 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
                 key={r.id}
                 reservation={r}
                 busy={actionId === r.id}
-                onConfirm={() => handleAction(r, 'confirmed')}
-                onReject={() => handleAction(r, 'rejected')}
-                onDelete={() => handleDelete(r.id)}
+                onConfirm={() => void handleAction(r, 'confirmed')}
+                onReject={() => void handleAction(r, 'rejected')}
+                onDelete={() => void handleDelete(r.id)}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Confirmed / rejected */}
       {rest.length > 0 && (
         <div>
           <h4 className="text-[12px] tracking-[0.2em] uppercase text-muted font-medium mb-4">
@@ -161,7 +163,7 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
                 key={r.id}
                 reservation={r}
                 busy={actionId === r.id}
-                onDelete={() => handleDelete(r.id)}
+                onDelete={() => void handleDelete(r.id)}
               />
             ))}
           </div>
@@ -207,7 +209,6 @@ export function ReservationsPanel({ onConfirm, onRelease, onToast }: Reservation
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex gap-2 items-center flex-wrap shrink-0">
             {r.status === 'pending' && confirm && reject && (
               <>

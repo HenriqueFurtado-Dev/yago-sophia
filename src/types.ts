@@ -16,9 +16,8 @@ export interface Settings {
   data: string
   frase: string
   pix: string
-  pixCode: string   // código copia-e-cola (EMV)
-  pixQrUrl: string  // URL da imagem do QR Code
-  senha: string
+  pixCode: string
+  pixQrUrl: string
 }
 
 export interface Reservation {

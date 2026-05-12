@@ -9,6 +9,34 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+function authHeader(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` }
+}
+
+// ── Auth ─────────────────────────────────────────────────
+
+export function login(password: string): Promise<{ token: string }> {
+  return request('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+}
+
+export function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return request('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}
+
+// ── Reservations ─────────────────────────────────────────
+
 export function createReservation(data: {
   gift_id: number
   gift_name: string
@@ -23,21 +51,25 @@ export function createReservation(data: {
   })
 }
 
-export function fetchReservations(): Promise<Reservation[]> {
-  return request('/api/reservations')
+export function fetchReservations(token: string): Promise<Reservation[]> {
+  return request('/api/reservations', { headers: authHeader(token) })
 }
 
 export function updateReservation(
   id: number,
   status: 'confirmed' | 'rejected',
+  token: string,
 ): Promise<Reservation> {
   return request(`/api/reservations/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ status }),
   })
 }
 
-export function deleteReservation(id: number): Promise<void> {
-  return request(`/api/reservations/${id}`, { method: 'DELETE' })
+export function deleteReservation(id: number, token: string): Promise<void> {
+  return request(`/api/reservations/${id}`, {
+    method: 'DELETE',
+    headers: authHeader(token),
+  })
 }

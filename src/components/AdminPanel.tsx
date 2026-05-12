@@ -8,6 +8,7 @@ type Tab = 'gifts' | 'reservations'
 interface AdminPanelProps {
   gifts: Gift[]
   isAdmin: boolean
+  token: string | null
   onLogout: () => void
   onOpenSettings: () => void
   onOpenAdd: () => void
@@ -21,6 +22,7 @@ interface AdminPanelProps {
 export function AdminPanel({
   gifts,
   isAdmin,
+  token,
   onLogout,
   onOpenSettings,
   onOpenAdd,
@@ -49,7 +51,6 @@ export function AdminPanel({
           <span className="font-playfair text-cream text-[16px] sm:text-[18px]">
             Painel de Administração
           </span>
-          {/* Tabs */}
           <div className="flex bg-white/10 rounded-lg p-1 gap-1">
             <button onClick={() => setTab('gifts')} className={tabCls('gifts')}>
               Presentes
@@ -108,6 +109,7 @@ export function AdminPanel({
       {tab === 'reservations' && (
         <div className="pt-8 pb-20">
           <ReservationsPanel
+            token={token}
             onConfirm={onConfirmReservation}
             onRelease={onReleaseGift}
             onToast={onToast}

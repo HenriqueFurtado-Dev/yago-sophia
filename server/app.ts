@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { neon } from '@neondatabase/serverless'
+import type { Context, Next } from 'hono'
+import { hashPassword, verifyPassword, createToken, verifyToken } from './crypto.js'
 
 function getDb() {
   const url = process.env.DATABASE_URL
@@ -12,7 +14,72 @@ export const app = new Hono()
 
 app.use('*', cors({ origin: '*' }))
 
-// ── POST /api/reservations ────────────────────────────────
+// ── Auth middleware ───────────────────────────────────────
+async function requireAuth(c: Context, next: Next) {
+  const auth = c.req.header('Authorization')
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+  if (!token || !(await verifyToken(token))) {
+    return c.json({ error: 'Não autorizado.' }, 401)
+  }
+  await next()
+}
+
+// ── POST /api/auth/login ──────────────────────────────────
+app.post('/api/auth/login', async c => {
+  const { password } = await c.req.json<{ password: string }>()
+  if (!password) return c.json({ error: 'Senha obrigatória.' }, 400)
+
+  const sql = getDb()
+  const rows = await sql`SELECT password_hash FROM admin_config WHERE id = 1`
+
+  let valid = false
+  if (rows.length === 0) {
+    // Bootstrap: first login uses ADMIN_INITIAL_PASSWORD, then stores hash in DB
+    const initial = process.env.ADMIN_INITIAL_PASSWORD
+    if (!initial) return c.json({ error: 'Servidor não configurado. Defina ADMIN_INITIAL_PASSWORD.' }, 500)
+    if (password === initial) {
+      const hash = await hashPassword(password)
+      await sql`INSERT INTO admin_config (id, password_hash) VALUES (1, ${hash})`
+      valid = true
+    }
+  } else {
+    valid = await verifyPassword(password, rows[0].password_hash as string)
+  }
+
+  if (!valid) return c.json({ error: 'Senha incorreta.' }, 401)
+
+  const token = await createToken()
+  return c.json({ token })
+})
+
+// ── POST /api/auth/change-password ───────────────────────
+app.post('/api/auth/change-password', requireAuth, async c => {
+  const { currentPassword, newPassword } = await c.req.json<{
+    currentPassword: string
+    newPassword: string
+  }>()
+
+  if (!currentPassword || !newPassword) {
+    return c.json({ error: 'Campos obrigatórios.' }, 400)
+  }
+  if (newPassword.length < 8) {
+    return c.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, 400)
+  }
+
+  const sql = getDb()
+  const rows = await sql`SELECT password_hash FROM admin_config WHERE id = 1`
+  if (rows.length === 0) return c.json({ error: 'Nenhuma senha configurada.' }, 500)
+
+  const valid = await verifyPassword(currentPassword, rows[0].password_hash as string)
+  if (!valid) return c.json({ error: 'Senha atual incorreta.' }, 401)
+
+  const newHash = await hashPassword(newPassword)
+  await sql`UPDATE admin_config SET password_hash = ${newHash}, updated_at = NOW() WHERE id = 1`
+
+  return c.json({ ok: true })
+})
+
+// ── POST /api/reservations (público — convidados) ─────────
 app.post('/api/reservations', async c => {
   const sql = getDb()
   const body = await c.req.json<{
@@ -46,15 +113,15 @@ app.post('/api/reservations', async c => {
   return c.json(rows[0], 201)
 })
 
-// ── GET /api/reservations ─────────────────────────────────
-app.get('/api/reservations', async c => {
+// ── GET /api/reservations (admin) ─────────────────────────
+app.get('/api/reservations', requireAuth, async c => {
   const sql = getDb()
   const rows = await sql`SELECT * FROM reservations ORDER BY created_at DESC`
   return c.json(rows)
 })
 
-// ── PATCH /api/reservations/:id ──────────────────────────
-app.patch('/api/reservations/:id', async c => {
+// ── PATCH /api/reservations/:id (admin) ──────────────────
+app.patch('/api/reservations/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   const { status } = await c.req.json<{ status: 'confirmed' | 'rejected' }>()
@@ -75,8 +142,8 @@ app.patch('/api/reservations/:id', async c => {
   return c.json(rows[0])
 })
 
-// ── DELETE /api/reservations/:id ─────────────────────────
-app.delete('/api/reservations/:id', async c => {
+// ── DELETE /api/reservations/:id (admin) ─────────────────
+app.delete('/api/reservations/:id', requireAuth, async c => {
   const sql = getDb()
   const id = Number(c.req.param('id'))
   await sql`DELETE FROM reservations WHERE id = ${id}`

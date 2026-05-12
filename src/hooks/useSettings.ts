@@ -9,13 +9,16 @@ const DEFAULT_SETTINGS: Settings = {
   pix: 'casamento@email.com',
   pixCode: '',
   pixQrUrl: '',
-  senha: 'casamento2025',
 }
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(() => {
     const stored = localStorage.getItem('wl_settings')
-    return stored ? (JSON.parse(stored) as Settings) : DEFAULT_SETTINGS
+    if (!stored) return DEFAULT_SETTINGS
+    // Strip legacy `senha` field from older stored data
+    const parsed = JSON.parse(stored) as Record<string, unknown>
+    delete parsed['senha']
+    return { ...DEFAULT_SETTINGS, ...parsed } as Settings
   })
 
   useEffect(() => {

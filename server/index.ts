@@ -2,7 +2,6 @@ import { serve } from '@hono/node-server'
 import { neon } from '@neondatabase/serverless'
 import { app } from './app.js'
 
-// Cria a tabela se não existir (só no dev local)
 async function initDb() {
   const sql = neon(process.env.DATABASE_URL!)
   await sql`
@@ -18,7 +17,15 @@ async function initDb() {
       confirmed_at TIMESTAMPTZ
     )
   `
-  console.log('✓ Tabela reservations pronta')
+  await sql`
+    CREATE TABLE IF NOT EXISTS admin_config (
+      id            INTEGER PRIMARY KEY DEFAULT 1,
+      password_hash TEXT NOT NULL,
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT single_row CHECK (id = 1)
+    )
+  `
+  console.log('✓ Tabelas prontas')
 }
 
 initDb().catch(err => console.error('Erro ao inicializar DB:', err))

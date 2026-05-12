@@ -4,8 +4,10 @@ import type { Settings } from '../types'
 interface SettingsModalProps {
   isOpen: boolean
   settings: Settings
+  token: string | null
   onClose: () => void
   onSave: (updates: Partial<Settings>) => void
+  onChangePassword: (current: string, newPw: string) => Promise<void>
   onToast: (msg: string) => void
 }
 
@@ -13,7 +15,15 @@ const INPUT_CLS =
   'w-full px-4 py-3 border border-gold/25 rounded-lg font-jost text-[14px] text-ink bg-cream outline-none focus:border-gold focus:bg-white transition-colors'
 const LABEL_CLS = 'block text-[10px] sm:text-[11px] tracking-[0.2em] uppercase text-muted mb-2'
 
-export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: SettingsModalProps) {
+export function SettingsModal({
+  isOpen,
+  settings,
+  token,
+  onClose,
+  onSave,
+  onChangePassword,
+  onToast,
+}: SettingsModalProps) {
   const [form, setForm] = useState({
     nome1: settings.nome1,
     nome2: settings.nome2,
@@ -22,8 +32,10 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
     pix: settings.pix,
     pixCode: settings.pixCode,
     pixQrUrl: settings.pixQrUrl,
-    senha: '',
   })
+
+  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' })
+  const [pwLoading, setPwLoading] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -35,8 +47,8 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
         pix: settings.pix,
         pixCode: settings.pixCode,
         pixQrUrl: settings.pixQrUrl,
-        senha: '',
       })
+      setPwForm({ current: '', newPw: '', confirm: '' })
     }
   }, [isOpen, settings])
 
@@ -49,7 +61,7 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
   }
 
   function handleSave() {
-    const updates: Partial<Settings> = {
+    onSave({
       nome1: form.nome1.trim() || settings.nome1,
       nome2: form.nome2.trim() || settings.nome2,
       data: form.data || settings.data,
@@ -57,11 +69,35 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
       pix: form.pix.trim() || settings.pix,
       pixCode: form.pixCode.trim(),
       pixQrUrl: form.pixQrUrl.trim(),
-    }
-    if (form.senha) updates.senha = form.senha
-    onSave(updates)
+    })
     onToast('Configurações salvas! ✓')
     onClose()
+  }
+
+  async function handleChangePassword() {
+    if (!token) return
+    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) {
+      onToast('Preencha todos os campos de senha.')
+      return
+    }
+    if (pwForm.newPw !== pwForm.confirm) {
+      onToast('A confirmação não coincide com a nova senha.')
+      return
+    }
+    if (pwForm.newPw.length < 8) {
+      onToast('A nova senha deve ter pelo menos 8 caracteres.')
+      return
+    }
+    setPwLoading(true)
+    try {
+      await onChangePassword(pwForm.current, pwForm.newPw)
+      setPwForm({ current: '', newPw: '', confirm: '' })
+      onToast('Senha alterada com sucesso! ✓')
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Erro ao alterar senha.')
+    } finally {
+      setPwLoading(false)
+    }
   }
 
   return (
@@ -92,6 +128,7 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
         </div>
 
         <div className="px-6 sm:px-7 pb-8 pt-4 sm:pt-6 space-y-4">
+          {/* General settings */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL_CLS}>Nome 1</label>
@@ -148,17 +185,59 @@ export function SettingsModal({ isOpen, settings, onClose, onSave, onToast }: Se
             )}
           </div>
 
-          <div>
-            <label className={LABEL_CLS}>Nova senha (em branco = não alterar)</label>
-            <input type="password" className={INPUT_CLS} placeholder="••••••••" {...field('senha')} />
-          </div>
-
           <button
             onClick={handleSave}
             className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown"
           >
             Salvar Configurações
           </button>
+
+          {/* Password change */}
+          <div className="border-t border-gold/20 pt-4 mt-2">
+            <p className="text-[11px] tracking-[0.2em] uppercase text-muted mb-3">Alterar senha</p>
+            <div className="space-y-3">
+              <div>
+                <label className={LABEL_CLS}>Senha atual</label>
+                <input
+                  type="password"
+                  className={INPUT_CLS}
+                  placeholder="••••••••"
+                  value={pwForm.current}
+                  onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))}
+                  disabled={pwLoading}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLS}>Nova senha</label>
+                <input
+                  type="password"
+                  className={INPUT_CLS}
+                  placeholder="Mínimo 8 caracteres"
+                  value={pwForm.newPw}
+                  onChange={e => setPwForm(p => ({ ...p, newPw: e.target.value }))}
+                  disabled={pwLoading}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLS}>Confirmar nova senha</label>
+                <input
+                  type="password"
+                  className={INPUT_CLS}
+                  placeholder="••••••••"
+                  value={pwForm.confirm}
+                  onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))}
+                  disabled={pwLoading}
+                />
+              </div>
+              <button
+                onClick={() => void handleChangePassword()}
+                disabled={pwLoading || !token}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-gold/40 text-brown text-[13px] font-medium tracking-[0.06em] uppercase transition-colors hover:bg-gold/10 disabled:opacity-50"
+              >
+                {pwLoading ? 'Alterando...' : 'Alterar Senha'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

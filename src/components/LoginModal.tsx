@@ -3,7 +3,7 @@ import { useState } from 'react'
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
-  onLogin: (password: string) => boolean
+  onLogin: (password: string) => Promise<boolean>
   onToast: (msg: string) => void
 }
 
@@ -12,14 +12,22 @@ const INPUT_CLS =
 
 export function LoginModal({ isOpen, onClose, onLogin, onToast }: LoginModalProps) {
   const [senha, setSenha] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function handleLogin() {
-    const ok = onLogin(senha)
-    if (!ok) {
-      onToast('Senha incorreta. Tente novamente.')
+  async function handleLogin() {
+    if (!senha.trim() || loading) return
+    setLoading(true)
+    try {
+      const ok = await onLogin(senha)
+      if (ok) {
+        setSenha('')
+        onClose()
+      } else {
+        onToast('Senha incorreta. Tente novamente.')
+      }
+    } finally {
+      setLoading(false)
     }
-    setSenha('')
-    if (ok) onClose()
   }
 
   return (
@@ -63,18 +71,17 @@ export function LoginModal({ isOpen, onClose, onLogin, onToast }: LoginModalProp
               placeholder="••••••••"
               value={senha}
               onChange={e => setSenha(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleLogin() }}
+              onKeyDown={e => { if (e.key === 'Enter') void handleLogin() }}
+              disabled={loading}
             />
           </div>
           <button
-            onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown"
+            onClick={() => void handleLogin()}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown disabled:opacity-60"
           >
-            Entrar
+            {loading ? 'Verificando...' : 'Entrar'}
           </button>
-          <p className="text-[11px] text-muted text-center mt-3">
-            Senha padrão: <strong>casamento2025</strong>
-          </p>
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ import type { Gift, ModalType } from './types'
 import { useGifts } from './hooks/useGifts'
 import { useSettings } from './hooks/useSettings'
 import { useAdmin } from './hooks/useAdmin'
+import { changePassword } from './api'
 import { Hero } from './components/Hero'
 import { GiftList } from './components/GiftList'
 import { GiftModal } from './components/GiftModal'
@@ -15,19 +16,17 @@ import { Toast } from './components/Toast'
 export function App() {
   const { gifts, addGift, updateGift, deleteGift, reserveGift, releaseGift } = useGifts()
   const { settings, updateSettings } = useSettings()
-  const { isAdmin, login, logout } = useAdmin()
+  const { isAdmin, token, login, logout } = useAdmin()
 
   const [openModal, setOpenModal] = useState<ModalType>(null)
   const [selectedGift, setSelectedGift] = useState<Gift | null>(null)
   const [editingGift, setEditingGift] = useState<Gift | null>(null)
   const [toast, setToast] = useState('')
 
-  // Update document title whenever couple names change
   useEffect(() => {
     document.title = `Lista de Presentes — ${settings.nome1} & ${settings.nome2}`
   }, [settings.nome1, settings.nome2])
 
-  // Scroll to admin panel after login
   useEffect(() => {
     if (!isAdmin) return
     setToast('Bem-vindo ao painel! 💛')
@@ -37,8 +36,8 @@ export function App() {
     return () => clearTimeout(timer)
   }, [isAdmin])
 
-  function handleLogin(password: string): boolean {
-    return login(password, settings.senha)
+  async function handleLogin(password: string): Promise<boolean> {
+    return login(password)
   }
 
   function handleLogout() {
@@ -53,6 +52,11 @@ export function App() {
     } else {
       setOpenModal('login')
     }
+  }
+
+  async function handleChangePassword(current: string, newPw: string): Promise<void> {
+    if (!token) throw new Error('Não autenticado.')
+    await changePassword(token, current, newPw)
   }
 
   function openGiftModal(gift: Gift) {
@@ -98,6 +102,7 @@ export function App() {
       <AdminPanel
         gifts={gifts}
         isAdmin={isAdmin}
+        token={token}
         onLogout={handleLogout}
         onOpenSettings={() => setOpenModal('settings')}
         onOpenAdd={handleOpenAdd}
@@ -128,8 +133,10 @@ export function App() {
       <SettingsModal
         isOpen={openModal === 'settings'}
         settings={settings}
+        token={token}
         onClose={closeModal}
         onSave={updateSettings}
+        onChangePassword={handleChangePassword}
         onToast={setToast}
       />
 
