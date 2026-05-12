@@ -36,8 +36,8 @@ export function App() {
     return () => clearTimeout(timer)
   }, [isAdmin])
 
-  async function handleLogin(password: string): Promise<boolean> {
-    return login(password)
+  async function handleLogin(password: string): Promise<void> {
+    await login(password)
   }
 
   function handleLogout() {

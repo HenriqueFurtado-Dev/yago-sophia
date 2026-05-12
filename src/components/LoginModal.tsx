@@ -3,7 +3,7 @@ import { useState } from 'react'
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
-  onLogin: (password: string) => Promise<boolean>
+  onLogin: (password: string) => Promise<void>
   onToast: (msg: string) => void
 }
 
@@ -18,13 +18,11 @@ export function LoginModal({ isOpen, onClose, onLogin, onToast }: LoginModalProp
     if (!senha.trim() || loading) return
     setLoading(true)
     try {
-      const ok = await onLogin(senha)
-      if (ok) {
-        setSenha('')
-        onClose()
-      } else {
-        onToast('Senha incorreta. Tente novamente.')
-      }
+      await onLogin(senha)
+      setSenha('')
+      onClose()
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : 'Senha incorreta. Tente novamente.')
     } finally {
       setLoading(false)
     }

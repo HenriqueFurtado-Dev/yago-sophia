@@ -20,15 +20,11 @@ export function useAdmin() {
 
   const isAdmin = token !== null
 
-  async function login(password: string): Promise<boolean> {
-    try {
-      const { token: newToken } = await apiLogin(password)
-      localStorage.setItem(TOKEN_KEY, newToken)
-      setToken(newToken)
-      return true
-    } catch {
-      return false
-    }
+  // Throws with the server error message on failure
+  async function login(password: string): Promise<void> {
+    const { token: newToken } = await apiLogin(password)
+    localStorage.setItem(TOKEN_KEY, newToken)
+    setToken(newToken)
   }
 
   function logout() {
