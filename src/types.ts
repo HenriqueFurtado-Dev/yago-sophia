@@ -21,4 +21,16 @@ export interface Settings {
   senha: string
 }
 
+export interface Reservation {
+  id: number
+  gift_id: number
+  gift_name: string
+  guest_name: string
+  amount: number | null
+  comprovante: string | null
+  status: 'pending' | 'confirmed' | 'rejected'
+  created_at: string
+  confirmed_at: string | null
+}
+
 export type ModalType = 'gift' | 'add-edit' | 'login' | 'settings' | null

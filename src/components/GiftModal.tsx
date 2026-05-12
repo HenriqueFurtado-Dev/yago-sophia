@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Gift, Settings } from '../types'
+import { createReservation } from '../api'
 
 interface GiftModalProps {
   gift: Gift | null
@@ -23,18 +24,33 @@ const BTN_COPY =
 export function GiftModal({ gift, settings, isOpen, onClose, onReserve, onToast }: GiftModalProps) {
   const [nome, setNome] = useState('')
   const [comprovante, setComprovante] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!nome.trim()) {
       onToast('Por favor, informe seu nome 💛')
       return
     }
     if (!gift) return
-    onReserve(gift.id, nome.trim())
-    onToast(`Obrigado, ${nome.trim()}! Aguardando confirmação dos noivos 💛`)
-    setNome('')
-    setComprovante('')
-    onClose()
+    setLoading(true)
+    try {
+      await createReservation({
+        gift_id: gift.id,
+        gift_name: gift.nome,
+        guest_name: nome.trim(),
+        amount: gift.valor,
+        comprovante: comprovante.trim(),
+      })
+      onReserve(gift.id, nome.trim())
+      onToast(`Obrigado, ${nome.trim()}! Aguardando confirmação dos noivos 💛`)
+      setNome('')
+      setComprovante('')
+      onClose()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Erro ao registrar. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function copy(text: string, label: string) {
@@ -153,9 +169,10 @@ export function GiftModal({ gift, settings, isOpen, onClose, onReserve, onToast 
 
           <button
             onClick={handleConfirm}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gold text-white text-[13px] font-medium tracking-[0.06em] uppercase transition-colors active:bg-brown sm:hover:bg-brown disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            ✓ Já fiz o PIX — registrar presente
+            {loading ? 'Registrando...' : '✓ Já fiz o PIX — registrar presente'}
           </button>
           <p className="text-[11px] text-muted text-center mt-3 leading-relaxed">
             Os noivos confirmarão o pagamento e seu nome aparecerá na lista 💛

@@ -104,6 +104,8 @@ export function App() {
         onEditGift={handleEditGift}
         onDeleteGift={handleDeleteGift}
         onReleaseGift={handleReleaseGift}
+        onConfirmReservation={reserveGift}
+        onToast={setToast}
       />
 
       {/* Modals */}
